@@ -1,0 +1,3 @@
+This is the text we want to encode. For doing that we use two different methods: 
+1.  Huffmann method
+2.  LZW method
