@@ -346,3 +346,104 @@ def convert_C_to_S_LZW(SET_RX, SED_RX, fill_bit_number_T, fill_bit_number_D):
             key, value = line.split("¢")
             dictionary[key] = int(value)
     return SET_RX, dictionary
+
+
+#AM
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import butter, filtfilt
+import scipy.io
+
+def am_modulate(binary_message, carrier_freq, fs, num_cycles):
+    # Convert binary message to square wave
+    bit_duration = num_cycles / carrier_freq
+    samples_per_bit = int(fs * bit_duration)
+    
+    # Create the square wave with the correct length
+    square_wave = np.repeat(binary_message, samples_per_bit)
+    
+    # Generate the carrier wave with the correct length
+    t = np.arange(len(square_wave)) / fs
+    carrier = np.cos(2 * np.pi * carrier_freq * t)
+    
+    # Modulate the square wave
+    modulated_signal = (1 + square_wave) * carrier
+    return modulated_signal
+
+def am_demodulate(modulated_signal, carrier_freq, fs, num_cycles, cutoff_freq):
+    # Generate the time vector
+    t = np.arange(len(modulated_signal)) / fs
+    # Generate the carrier signal
+    carrier = np.cos(2 * np.pi * carrier_freq * t)
+    # Demodulate the signal
+    demodulated_signal = modulated_signal * carrier
+    demodulated_signal = np.abs(demodulated_signal)
+    
+    # Apply low-pass filter to the demodulated signal directly here
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff_freq / nyq
+    b, a = butter(5, normal_cutoff, btype='low', analog=False)
+    filtered_demodulated_signal = filtfilt(b, a, demodulated_signal)
+    
+    # Convert the filtered demodulated signal back to binary data
+    filtered_demodulated_signal = np.round(2 * filtered_demodulated_signal) - 1
+    bit_duration = num_cycles / carrier_freq
+    samples_per_bit = int(fs * bit_duration)
+    num_bits = len(filtered_demodulated_signal) // samples_per_bit
+    binary_data = np.zeros(num_bits)
+
+    for i in range(num_bits):
+        segment = filtered_demodulated_signal[i * samples_per_bit:(i + 1) * samples_per_bit]
+        binary_data[i] = 1 if np.mean(segment) > 0.5 else 0  # Use mean to determine bit value
+
+    return binary_data.astype(int)
+
+#FSK
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import butter, lfilter
+
+def fsk_modulate(data, f0, f1, fs, duration):
+    t = np.arange(0, duration * len(data), 1/fs)
+    modulated_signal = np.zeros(len(t))
+
+    for i, bit in enumerate(data):
+        if bit == 0:
+            modulated_signal[i * int(fs * duration):(i + 1) * int(fs * duration)] = np.sin(2 * np.pi * f0 * t[i * int(fs * duration):(i + 1) * int(fs * duration)])
+        else:
+            modulated_signal[i * int(fs * duration):(i + 1) * int(fs * duration)] = np.sin(2 * np.pi * f1 * t[i * int(fs * duration):(i + 1) * int(fs * duration)])
+    
+    return modulated_signal
+
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+def bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    return lfilter(b, a, data)
+
+def fsk_demodulate(modulated_signal, f0, f1, fs, duration):
+    demodulated_data = []
+    for i in range(len(modulated_signal) // int(fs * duration)):
+        segment = modulated_signal[i * int(fs * duration):(i + 1) * int(fs * duration)]
+        
+        # Filter for f0
+        filtered_f0 = bandpass_filter(segment, f0 - 50, f0 + 50, fs)
+        # Filter for f1
+        filtered_f1 = bandpass_filter(segment, f1 - 50, f1 + 50, fs)
+        
+        # Check energy in both filtered signals
+        energy_f0 = np.sum(filtered_f0 ** 2)
+        energy_f1 = np.sum(filtered_f1 ** 2)
+        
+        # Determine which frequency has more energy
+        if energy_f0 > energy_f1:
+            demodulated_data.append(0)
+        else:
+            demodulated_data.append(1)
+    
+    return demodulated_data
