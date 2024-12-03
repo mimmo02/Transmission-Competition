@@ -354,7 +354,13 @@ import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 import scipy.io
 
-def am_modulate(binary_message, carrier_freq, fs, num_cycles):
+
+def am_modulate(binary_message):
+
+    fs = int(44e3)  # Sampling frequency in Hz, converted to integer
+    carrier_freq = 15e3 # Carrier frequency in Hz
+    num_cycles = 5  # Number of cycles for one bit
+
     # Convert binary message to square wave
     bit_duration = num_cycles / carrier_freq
     samples_per_bit = int(fs * bit_duration)
@@ -370,7 +376,12 @@ def am_modulate(binary_message, carrier_freq, fs, num_cycles):
     modulated_signal = (1 + square_wave) * carrier
     return modulated_signal
 
-def am_demodulate(modulated_signal, carrier_freq, fs, num_cycles, cutoff_freq):
+def am_demodulate(modulated_signal):
+    fs = int(44e3)  # Sampling frequency in Hz, converted to integer
+    carrier_freq = 15e3 # Carrier frequency in Hz
+    cutoff_freq = carrier_freq / 2  # Cutoff frequency for low-pass filter
+    num_cycles = 5  # Number of cycles for one bit
+
     # Generate the time vector
     t = np.arange(len(modulated_signal)) / fs
     # Generate the carrier signal
