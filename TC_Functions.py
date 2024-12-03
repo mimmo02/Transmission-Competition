@@ -258,23 +258,34 @@ def split_packet(message, packet_size):
     print("@channel_coding_layer-> Packets: ", packets)
     return packets
 
-def channel_coding(MSG): 
+def channel_coding(MSG,Hamming_size): 
     print("@channel_coding_layer-> ENCODING DATA ////////////////////////////////////////////////")
-    packet_size = 11
+    if Hamming_size == "15x11":
+        packet_size = 11
+        G = G_15_11
+    elif Hamming_size == "7x4":
+        packet_size = 4
+        G = G_7_4
     packets = split_packet(MSG, packet_size)
     codewords = []
     print("@channel_coding_layer-> ENCODING DATA PACKETS ////////////////////////////////////////")
     for packet in packets:
-        codeword = channel_code_gen(packet, G_15_11)
+        codeword = channel_code_gen(packet, G)
         codewords.append(codeword)
         
     return codewords
 
-def channel_decoding(COD):
+def channel_decoding(COD,Hamming_size):
     print("@channel_coding_layer-> DECODING DATA PACKETS ////////////////////////////////////////")
+    if Hamming_size == "15x11":
+        H = H_15_11
+        D = D_15_11
+    elif Hamming_size == "7x4":
+        H = H_7_4
+        D = D_7_4
     packets = []
     for codeword in COD:
-        packet = channel_decode_gen(codeword, H_15_11, D_15_11)
+        packet = channel_decode_gen(codeword, H, D)
         packets.append(packet)
     print("@channel_coding_layer-> Decoded Packets: ", packets)
     # first packet is the number of zeros added
