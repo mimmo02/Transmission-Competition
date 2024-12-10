@@ -134,6 +134,138 @@ def LZW_decoding(code, dictionary):
     print('@source_decoding_layer.LZW-> Decoded text:', text)
     return text
 
+# V2 of the source layer functions
+
+# Encapsulation of the source coding layer
+def encapsulation_source_coding_layer(method, encoded_text, dictionary): 
+    if method == 0:
+        # Convert dictionary in a binary string with separators: ¢ for key-value and § for new line
+        dict_str = ""
+        for key, value in dictionary.items():
+            # se è l'ultimo elemento non mettere il carattere di new line
+            if key == list(dictionary.keys())[-1]:
+                dict_str += key + "¢" + str(value)
+            else:
+                dict_str += key + "¢" + str(value) + "§"
+        print("so:",dict_str)
+        # String to binary 1-bit packet of the dictionary+encoded text serialized (one array)
+        encoded_text = [int(i) for i in encoded_text]
+        dictionary = ''.join(format(ord(i), '08b') for i in dict_str)
+        dictionary = [int(i) for i in dictionary]
+        # Put all together
+        converted_data = dictionary + encoded_text
+        # Add Header to the data package (Header: 32bits = Huffman/LZW 1bit + length dictionary 17bits + length text 14bits) (list to string)
+        header = [0] + [int(bit) for bit in ''.join(format(len(dictionary), '017b'))] + [int(bit) for bit in ''.join(format(len(encoded_text), '014b'))]
+        encapsulated_data = header + converted_data
+
+    elif method == 1:
+        # Convert dictionary in a binary string with separators: ¢ for key-value and § for new line
+        dict_str = ""
+        for key, value in dictionary.items():
+            # se è l'ultimo elemento non mettere il carattere di new line
+            if key == list(dictionary.keys())[-1]:
+                dict_str += key + "¢" + str(value)
+            else:
+                dict_str += key + "¢" + str(value) + "§"
+
+        # String to binary 1-bit packet of the dictionary+encoded text serialized (one array)
+        encoded_text = ''.join([format(i, '012b') for i in encoded_text])
+        encoded_text = [int(i) for i in encoded_text]
+        dictionary = ''.join(format(ord(i), '012b') for i in dict_str)
+        dictionary = [int(i) for i in dictionary]
+
+        # Put all together
+        converted_data = dictionary + encoded_text
+        # Add Header to the data package (Header: 32bits = Huffman/LZW 1bit + length dictionary 17bits + length text 14bits)
+        header = [1] + [int(bit) for bit in ''.join(format(len(dictionary), '017b'))] + [int(bit) for bit in ''.join(format(len(encoded_text), '014b'))]
+        encapsulated_data = header + converted_data
+    return encapsulated_data
+
+# Decapsulation of the source coding layer
+def decapsulation_source_coding_layer(encapsulated_data):
+    # Extract the header
+    header = encapsulated_data[:32]
+    # Get the method
+    method = header[0]
+    # Get the length of the dictionary
+    length_dict = int(''.join(map(str, header[1:18])), 2)
+    # Get the length of the text
+    length_text = int(''.join(map(str, header[18:])), 2)
+    # Get the dictionary
+    dictionary = encapsulated_data[32:32+length_dict]
+    # Get the text
+    encoded_text = encapsulated_data[32+length_dict:]
+
+    if method == 0:
+        # cast to string type and binary to char
+        encoded_text = ''.join([str(i) for i in encoded_text])
+        dictionary = ''.join([str(i) for i in dictionary])
+        dictionary = ''.join(chr(int(dictionary[i:i+8], 2)) for i in range(0, len(dictionary), 8))
+        print(encoded_text)
+        print(dictionary)
+        # reconstruct the dictionary
+        final_dictionary = {}
+        for line in dictionary.split("§"):
+            if line:
+                key, value = line.split("¢")
+                final_dictionary[key] = value
+        return encoded_text, final_dictionary, method
+    else:
+        # convert encoded_text to array type with integer (every 12bits)
+        encoded_text = ''.join([str(i) for i in encoded_text])
+        encoded_text = [int(encoded_text[i:i+12], 2) for i in range(0, len(encoded_text), 12)]
+        # cast to string type and binary to char
+        dictionary = ''.join([str(i) for i in dictionary])
+        dictionary = ''.join(chr(int(dictionary[i:i+12], 2)) for i in range(0, len(dictionary), 12))
+        # reconstruct the dictionary
+        final_dictionary = {}
+        for line in dictionary.split("§"):
+            if line:
+                key, value = line.split("¢")
+                final_dictionary[key] = int(value)
+        return encoded_text, final_dictionary, method
+    return
+
+# Source encoding layer function
+def source_encoding(textName):
+    # Import text from file and print it
+    text = open(textName+".txt", 'r').read()
+    print('@source_coding_layer-> Text:', text)
+    # Perform huffman and LZW encoding to compare and choose best method
+    encoded_text_huffman, dict_huffman = huffman_encoding(textName)
+    encoded_text_LZW, dict_LZW = LZW_encoding(textName)
+    # Encapsulate data both methods
+    encapsulated_data_source_H = encapsulation_source_coding_layer(0, encoded_text_huffman, dict_huffman)
+    encapsulated_data_source_L = encapsulation_source_coding_layer(1, encoded_text_LZW, dict_LZW)
+    # Get length of the two methods
+    Huffman_length = len(encapsulated_data_source_H)
+    print('@source_coding_layer-> Huffman length:', Huffman_length)
+    LZW_length = len(encapsulated_data_source_L)
+    print('@source_coding_layer-> LZW length:', LZW_length) 
+    # Choose the best method
+    if Huffman_length < LZW_length:
+        print('@source_coding_layer-> Huffman encoding is the best method')
+        encapsulated_data_source = encapsulated_data_source_H
+    else:
+        print('@source_coding_layer-> LZW encoding is the best method')
+        encapsulated_data_source = encapsulated_data_source_L
+    # Encapsulate data
+    print('@source_coding_layer-> Source Encoding Data:', encapsulated_data_source)
+    return encapsulated_data_source
+
+
+# Source decoding layer function using convert_C_to_S_Huffman and convert_C_to_S_LZW
+def source_decoding(data_received):
+    encoded_text, dictionary, method = decapsulation_source_coding_layer(data_received)
+    if method == 0:
+        # Decode the Huffman data
+        source_decoding_data = huffman_decoding(encoded_text, dictionary)
+    else:
+        # Decode the LZW data
+        source_decoding_data = LZW_decoding(encoded_text, dictionary)
+    print('@source_decoding_layer-> Source Decoding Data:', source_decoding_data)
+    return source_decoding_data
+
 # CHANNEL CODING LAYER
 
 # notation G: generation matrix, H: parity-check matrix, D: data extraction matrix
