@@ -597,6 +597,39 @@ def am_demodulate(modulated_signal):
 
     return binary_data.astype(int)
 
+#Chirp
+def chirp_modulate(data):
+    fc = 15e3  # Carrier frequency
+    bw = 2e3   # Bandwidth
+    T = 0.02    # Duration of each chirp
+    fs = 44e3  # Sampling frequency
+    t = np.arange(0, T, 1/fs)  # Time vector
+
+    # Preallocate the chirp signal array
+    chirp_signal = np.zeros(len(data) * len(t))
+
+    for i in range(len(data)):
+        start_index = i * len(t)
+        if data[i] == 0:
+            chirp_signal[start_index:start_index + len(t)] = np.cos(2 * np.pi * ((fc + bw/2) * t + ((fc - bw/2) - ((fc + bw/2))) / (2 * T) * t**2))
+        elif data[i] == 1:
+            chirp_signal[start_index:start_index + len(t)] = np.cos(2 * np.pi * ((fc - bw/2) * t + ((fc + bw/2) - (fc - bw/2)) / (2 * T) * t**2))
+
+    return chirp_signal
+
+
+def chirp_demodulate(received_signal, fs):
+    # Constants
+    T = 0.02     # Duration of each chirp
+    fc = 15e3  # Carrier frequency
+    bw = 2e3   # Bandwidth
+    t = np.arange(0, T, 1/fs)  # Time vector for the chirp
+
+    up = np.cos(2 * np.pi * ((fc + bw/2) * t + ((fc - bw/2) - ((fc + bw/2))) / (2 * T) * t**2))
+    down = np.cos(2 * np.pi * ((fc - bw/2) * t + ((fc + bw/2) - (fc - bw/2)) / (2 * T) * t**2))
+
+    result = []
+
 #FSK
 import numpy as np
 import matplotlib.pyplot as plt
