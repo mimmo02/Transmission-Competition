@@ -318,6 +318,30 @@ D_15_11 = [[0,0,0,0,0,0,0,0,0,0,0],
            [0,0,0,0,0,0,0,0,0,1,0],
            [0,0,0,0,0,0,0,0,0,0,1]]
 
+# size = 4x7
+G_7_4 = [[1,1,1,0,0,0,0],
+         [1,0,0,1,1,0,0],
+         [0,1,0,1,0,1,0],
+         [1,1,0,1,0,0,1]]
+
+# size = 7x3
+H_7_4 = [[1,0,0],
+         [0,1,0],
+         [1,1,0],
+         [0,0,1],
+         [1,0,1],
+         [0,1,1],
+         [1,1,1]]
+
+# size = 7x4
+D_7_4 = [[0,0,0,0],
+         [0,0,0,0],
+         [1,0,0,0],
+         [0,0,0,0],
+         [0,1,0,0],
+         [0,0,1,0],
+         [0,0,0,1]]
+
 def channel_code_gen(data, G):
     # data: binary data
     # G: generation matrix
@@ -366,23 +390,34 @@ def split_packet(message, packet_size):
     print("@channel_coding_layer-> Packets: ", packets)
     return packets
 
-def channel_coding(MSG): 
+def channel_coding(MSG,Hamming_size): 
     print("@channel_coding_layer-> ENCODING DATA ////////////////////////////////////////////////")
-    packet_size = 11
+    if Hamming_size == "15x11":
+        packet_size = 11
+        G = G_15_11
+    elif Hamming_size == "7x4":
+        packet_size = 4
+        G = G_7_4
     packets = split_packet(MSG, packet_size)
     codewords = []
     print("@channel_coding_layer-> ENCODING DATA PACKETS ////////////////////////////////////////")
     for packet in packets:
-        codeword = channel_code_gen(packet, G_15_11)
+        codeword = channel_code_gen(packet, G)
         codewords.append(codeword)
         
     return codewords
 
-def channel_decoding(COD):
+def channel_decoding(COD,Hamming_size):
     print("@channel_coding_layer-> DECODING DATA PACKETS ////////////////////////////////////////")
+    if Hamming_size == "15x11":
+        H = H_15_11
+        D = D_15_11
+    elif Hamming_size == "7x4":
+        H = H_7_4
+        D = D_7_4
     packets = []
     for codeword in COD:
-        packet = channel_decode_gen(codeword, H_15_11, D_15_11)
+        packet = channel_decode_gen(codeword, H, D)
         packets.append(packet)
     print("@channel_coding_layer-> Decoded Packets: ", packets)
     # first packet is the number of zeros added
@@ -479,6 +514,33 @@ def convert_C_to_S_LZW(SET_RX, SED_RX, fill_bit_number_T, fill_bit_number_D):
             dictionary[key] = int(value)
     return SET_RX, dictionary
 
+# encapsulate the Channel Coding Layer data
+def channel_coding_encapsulate(CCL_data, Hamming_size):
+    # serialize the data
+    np.array(CCL_data).ravel()
+    # add the Header: 0 = H(15x11), 1 = H(7x4)
+    if Hamming_size == "15x11":
+        header = [0]
+    elif Hamming_size == "7x4":
+        header = [1]
+    # add the header to the data
+    CCL_block = np.insert(CCL_data, 0, header)
+    return CCL_block
+
+# decapsulate the Channel Coding Layer data
+def channel_coding_decapsulate(CCL_block):
+    # remove the header
+    header = CCL_block[0]
+    CCL_block = CCL_block[1:]
+    if header == 0:
+        Hamming_size = "15x11"
+        CCL_data = np.array(CCL_block).reshape(-1, 15)
+    elif header == 1:
+        Hamming_size = "7x4"
+        CCL_data = np.array(CCL_block).reshape(-1, 7)
+    
+    # return the data and the header
+    return CCL_data, Hamming_size
 
 #AM
 import numpy as np
@@ -486,7 +548,13 @@ import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 import scipy.io
 
-def am_modulate(binary_message, carrier_freq, fs, num_cycles):
+
+def am_modulate(binary_message):
+
+    fs = int(44e3)  # Sampling frequency in Hz, converted to integer
+    carrier_freq = 15e3 # Carrier frequency in Hz
+    num_cycles = 5  # Number of cycles for one bit
+
     # Convert binary message to square wave
     bit_duration = num_cycles / carrier_freq
     samples_per_bit = int(fs * bit_duration)
@@ -502,7 +570,12 @@ def am_modulate(binary_message, carrier_freq, fs, num_cycles):
     modulated_signal = (1 + square_wave) * carrier
     return modulated_signal
 
-def am_demodulate(modulated_signal, carrier_freq, fs, num_cycles, cutoff_freq):
+def am_demodulate(modulated_signal):
+    fs = int(44e3)  # Sampling frequency in Hz, converted to integer
+    carrier_freq = 15e3 # Carrier frequency in Hz
+    cutoff_freq = carrier_freq / 2  # Cutoff frequency for low-pass filter
+    num_cycles = 5  # Number of cycles for one bit
+
     # Generate the time vector
     t = np.arange(len(modulated_signal)) / fs
     # Generate the carrier signal
