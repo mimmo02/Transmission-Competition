@@ -597,7 +597,7 @@ def am_demodulate(modulated_signal):
 
     return binary_data.astype(int)
 
-#Chirp
+# Chirp
 def chirp_modulate(data):
     fc = 15e3  # Carrier frequency
     bw = 2e3   # Bandwidth
@@ -629,6 +629,19 @@ def chirp_demodulate(received_signal, fs):
     down = np.cos(2 * np.pi * ((fc - bw/2) * t + ((fc + bw/2) - (fc - bw/2)) / (2 * T) * t**2))
 
     result = []
+
+    for i in range(int(len(received_signal)/len(t))) :
+        signal_up = received_signal[i*len(t): (i + 1)*len(t)] * up
+        signal_down = received_signal[i*len(t): (i + 1)*len(t)] * down
+        mean_up = signal_up.sum() / len(signal_up)
+        mean_down = signal_down.sum() / len(signal_down)
+
+        if mean_up > mean_down and mean_up > 0.4 :
+            result.append(0)
+        elif mean_down > mean_up and mean_down > 0.4 :
+            result.append(1)
+
+    return np.array(result)
 
 #FSK
 import numpy as np
