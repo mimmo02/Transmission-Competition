@@ -118,7 +118,6 @@ def LZW_encoding(textName):
     # Print the encoded text
     print('@source_coding_layer.LZW-> Encoded text:', encoded_text)
     print('@source_coding_layer.LZW-> Dictionary:', dictionary)
-    print('@source_coding_layer.LZW-> Dictionary size:', len(dictionary))
     return encoded_text, dictionary
 
 # Decode the LZW code
@@ -147,7 +146,6 @@ def encapsulation_source_coding_layer(method, encoded_text, dictionary):
                 dict_str += key + "¢" + str(value)
             else:
                 dict_str += key + "¢" + str(value) + "§"
-        print("so:",dict_str)
         # String to binary 1-bit packet of the dictionary+encoded text serialized (one array)
         encoded_text = [int(i) for i in encoded_text]
         dictionary = ''.join(format(ord(i), '08b') for i in dict_str)
