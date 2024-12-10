@@ -24,9 +24,8 @@ def get_info_text(text):
 # SOURCE CODING LAYER
 
 # Function that encode a source code with the Huffman algorithm
-def huffman_encoding(textName):
+def huffman_encoding(text):
     # Import text from file and print it
-    text = open(textName+".txt", 'r').read()
     print('@source_coding_layer.HFM-> Text:', text)
     print('@source_coding_layer.HFM-> HUFFMAN ENCODING ////////////////////////////////////////////////')
     # Perform the Entropy and Entropy of a uniform distribution of the text
@@ -88,9 +87,7 @@ def huffman_decoding(encoded_text, dictionary):
     return decoded_text
 
 # Encoding LZW algorithm
-def LZW_encoding(textName):
-    # Import text from file and print it
-    text = open(textName+".txt", 'r').read()
+def LZW_encoding(text):
     print('@source_coding_layer.LZW-> Text:', text)
     # Initialization of the dictionary based on the text in order of appearance {character: index}
     dictionary = {text[0]: 0}
@@ -225,13 +222,12 @@ def decapsulation_source_coding_layer(encapsulated_data):
     return
 
 # Source encoding layer function
-def source_encoding(textName):
+def source_encoding(text):
     # Import text from file and print it
-    text = open(textName+".txt", 'r').read()
     print('@source_coding_layer-> Text:', text)
     # Perform huffman and LZW encoding to compare and choose best method
-    encoded_text_huffman, dict_huffman = huffman_encoding(textName)
-    encoded_text_LZW, dict_LZW = LZW_encoding(textName)
+    encoded_text_huffman, dict_huffman = huffman_encoding(text)
+    encoded_text_LZW, dict_LZW = LZW_encoding(text)
     # Encapsulate data both methods
     encapsulated_data_source_H = encapsulation_source_coding_layer(0, encoded_text_huffman, dict_huffman)
     encapsulated_data_source_L = encapsulation_source_coding_layer(1, encoded_text_LZW, dict_LZW)
