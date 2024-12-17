@@ -25,8 +25,6 @@ def get_info_text(text):
 
 # Function that encode a source code with the Huffman algorithm
 def huffman_encoding(text):
-    # Import text from file and print it
-    print('@source_coding_layer.HFM-> Text:', text)
     print('@source_coding_layer.HFM-> HUFFMAN ENCODING ////////////////////////////////////////////////')
     # Perform the Entropy and Entropy of a uniform distribution of the text
     unique, counts = np.unique(list(text), return_counts=True)
@@ -82,13 +80,10 @@ def huffman_decoding(encoded_text, dictionary):
         if code in dictionary.keys():
             decoded_text += dictionary[code]
             code = ''
-    # Print the decoded text
-    print('@source_decoding_layer.HFM-> Decoded text:', decoded_text)
     return decoded_text
 
 # Encoding LZW algorithm
 def LZW_encoding(text):
-    print('@source_coding_layer.LZW-> Text:', text)
     # Initialization of the dictionary based on the text in order of appearance {character: index}
     dictionary = {text[0]: 0}
     for i in range(1, len(text)):
@@ -126,8 +121,6 @@ def LZW_decoding(code, dictionary):
     text = ""
     for c in code:
         text += dictionary[c]
-    # Print the decoded text
-    print('@source_decoding_layer.LZW-> Decoded text:', text)
     return text
 
 # V2 of the source layer functions
