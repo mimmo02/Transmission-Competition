@@ -84,6 +84,7 @@ def huffman_decoding(encoded_text, dictionary):
 
 # Encoding LZW algorithm
 def LZW_encoding(text):
+    print('@source_coding_layer.LZW-> LZW ENCODING ////////////////////////////////////////////////')
     # Initialization of the dictionary based on the text in order of appearance {character: index}
     dictionary = {text[0]: 0}
     for i in range(1, len(text)):
