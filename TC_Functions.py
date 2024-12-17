@@ -514,9 +514,9 @@ def channel_coding_encapsulate(CCL_data, Hamming_size):
     np.array(CCL_data).ravel()
     # add the Header: 0 = H(15x11), 1 = H(7x4)
     if Hamming_size == "15x11":
-        header = [0]
+        header = [0,0,0,0,0,0,0,0,0,0]
     elif Hamming_size == "7x4":
-        header = [1]
+        header = [1,1,1,1,1,1,1,1,1,1]
     # add the header to the data
     CCL_block = np.insert(CCL_data, 0, header)
     return CCL_block
@@ -524,12 +524,13 @@ def channel_coding_encapsulate(CCL_data, Hamming_size):
 # decapsulate the Channel Coding Layer data
 def channel_coding_decapsulate(CCL_block):
     # remove the header
-    header = CCL_block[0]
-    CCL_block = CCL_block[1:]
-    if header == 0:
+    header = CCL_block[0:9]
+    CCL_block = CCL_block[10:]
+    header_mean = np.mean(header)
+    if header_mean < 0.5:
         Hamming_size = "15x11"
         CCL_data = np.array(CCL_block).reshape(-1, 15)
-    elif header == 1:
+    elif header_mean >= 0.5:
         Hamming_size = "7x4"
         CCL_data = np.array(CCL_block).reshape(-1, 7)
     
