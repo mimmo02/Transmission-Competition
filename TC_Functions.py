@@ -513,7 +513,7 @@ def channel_coding_encapsulate(CCL_data, Hamming_size):
     # add the header to the data
     CCL_block = np.insert(CCL_data, 0, header)
     return CCL_block
-
+ 
 # decapsulate the Channel Coding Layer data
 def channel_coding_decapsulate(CCL_block):
     # remove the header
@@ -526,25 +526,42 @@ def channel_coding_decapsulate(CCL_block):
     elif header_mean >= 0.5:
         Hamming_size = "7x4"
         CCL_data = np.array(CCL_block).reshape(-1, 7)
-    
+   
     # return the data and the header
     return CCL_data, Hamming_size
 
+
 #AM
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
-import scipy.io
 
+class PLL:
+    def __init__(self, wc: float, phase_gain: float, freq_gain: float, sf=None):
+        self.wc = 2 * np.pi * wc / sf if sf else wc
+        self.pg, self.fg = phase_gain, freq_gain
+        self.freq_offset = 0
+        self.nco_phase = 0
 
-def am_modulate(binary_message):
+    def track(self, x: np.ndarray, ) -> np.ndarray:
+        y = np.zeros(len(x))
+        c = np.zeros(len(x))
+        for n in range(0, len(x)):
+            y[n] = np.cos(self.nco_phase)
+            phase_offset = -x[n] * np.sin(self.nco_phase)
+            self.freq_offset += self.fg * phase_offset
+            c[n] = self.pg * phase_offset + self.freq_offset
+            self.nco_phase += self.wc + c[n]
+            # wrap the phase over the [0, 2\pi] interval
+            self.nco_phase = (self.nco_phase + np.pi) % (2 * np.pi) - np.pi
+        return y, c
 
-    fs = int(44e3)  # Sampling frequency in Hz, converted to integer
-    carrier_freq = 15e3 # Carrier frequency in Hz
-    num_cycles = 5  # Number of cycles for one bit
+def am_modulate(binary_message, fs = 44e3, fc = 10e3,  num_cycles = 10):
+
+    fs = int(fs)
+    fc = int(fc)
 
     # Convert binary message to square wave
-    bit_duration = num_cycles / carrier_freq
+    bit_duration = num_cycles / fc
     samples_per_bit = int(fs * bit_duration)
     
     # Create the square wave with the correct length
@@ -552,35 +569,36 @@ def am_modulate(binary_message):
     
     # Generate the carrier wave with the correct length
     t = np.arange(len(square_wave)) / fs
-    carrier = np.cos(2 * np.pi * carrier_freq * t)
+    carrier = np.cos(2 * np.pi * fc * t)
     
     # Modulate the square wave
-    modulated_signal = (1 + square_wave) * carrier
+    modulated_signal = (1 + square_wave)/2 * carrier
     return modulated_signal
 
-def am_demodulate(modulated_signal):
-    fs = int(44e3)  # Sampling frequency in Hz, converted to integer
-    carrier_freq = 15e3 # Carrier frequency in Hz
-    cutoff_freq = carrier_freq / 2  # Cutoff frequency for low-pass filter
-    num_cycles = 5  # Number of cycles for one bit
+def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
 
-    # Generate the time vector
-    t = np.arange(len(modulated_signal)) / fs
+    fs = int(fs)
+    fc = int(fc)
+
+
+
+    modulated_signal = 2*modulated_signal
     # Generate the carrier signal
-    carrier = np.cos(2 * np.pi * carrier_freq * t)
+    y, c = PLL(fc, 0.01, 0.01, fs).track(modulated_signal)
+
     # Demodulate the signal
-    demodulated_signal = modulated_signal * carrier
+    demodulated_signal = modulated_signal * y
     demodulated_signal = np.abs(demodulated_signal)
     
     # Apply low-pass filter to the demodulated signal directly here
     nyq = 0.5 * fs
-    normal_cutoff = cutoff_freq / nyq
+    normal_cutoff = 0.5*fc / nyq
     b, a = butter(5, normal_cutoff, btype='low', analog=False)
     filtered_demodulated_signal = filtfilt(b, a, demodulated_signal)
     
     # Convert the filtered demodulated signal back to binary data
     filtered_demodulated_signal = np.round(2 * filtered_demodulated_signal) - 1
-    bit_duration = num_cycles / carrier_freq
+    bit_duration = num_cycles / fc
     samples_per_bit = int(fs * bit_duration)
     num_bits = len(filtered_demodulated_signal) // samples_per_bit
     binary_data = np.zeros(num_bits)
@@ -592,11 +610,8 @@ def am_demodulate(modulated_signal):
     return binary_data.astype(int)
 
 # Chirp
-def chirp_modulate(data):
-    fc = 15e3  # Carrier frequency
-    bw = 2e3   # Bandwidth
-    T = 0.02    # Duration of each chirp
-    fs = 44e3  # Sampling frequency
+def chirp_modulate(data, fs = 44e3, fc = 10e3, bw = 2e3, T = 0.01) :
+
     t = np.arange(0, T, 1/fs)  # Time vector
 
     # Preallocate the chirp signal array
@@ -612,11 +627,8 @@ def chirp_modulate(data):
     return chirp_signal
 
 
-def chirp_demodulate(received_signal, fs):
-    # Constants
-    T = 0.02     # Duration of each chirp
-    fc = 15e3  # Carrier frequency
-    bw = 2e3   # Bandwidth
+def chirp_demodulate(received_signal, fs, fc = 10e3, bw = 2e3, T = 0.01, debug = False):
+
     t = np.arange(0, T, 1/fs)  # Time vector for the chirp
 
     up = np.cos(2 * np.pi * ((fc + bw/2) * t + ((fc - bw/2) - ((fc + bw/2))) / (2 * T) * t**2))
@@ -624,9 +636,19 @@ def chirp_demodulate(received_signal, fs):
 
     result = []
 
+    nyq = 0.5 * fs
+    normal_cutoff = 0.5*fc / nyq
+    b, a = butter(5, normal_cutoff, btype='low', analog=False)
+
+
     for i in range(int(len(received_signal)/len(t))) :
         signal_up = received_signal[i*len(t): (i + 1)*len(t)] * up
         signal_down = received_signal[i*len(t): (i + 1)*len(t)] * down
+
+        signal_up = filtfilt(b, a, signal_up)
+        signal_down = filtfilt(b, a, signal_down)
+
+
         mean_up = signal_up.sum() / len(signal_up)
         mean_down = signal_down.sum() / len(signal_down)
 
@@ -635,54 +657,70 @@ def chirp_demodulate(received_signal, fs):
         elif mean_down > mean_up and mean_down > 0.4 :
             result.append(1)
 
+        
+        if debug : 
+            max = 1.5*np.max(np.abs(np.r_[received_signal[i*len(t): (i + 1)*len(t)], signal_up, signal_down]))
+            fig, axs = plt.subplots(3)
+            axs[0].plot(received_signal[i*len(t): (i + 1)*len(t)], "b")
+            axs[0].set(ylim=[-max, max])
+
+            axs[1].plot(signal_up, "r")
+            axs[1].set_title(str("mean up :" + str(round(mean_up, 3))) + " / var up :" + str(round(np.var(signal_up), 3)))
+            axs[1].set(ylim=[-max, max])
+
+            axs[2].plot(signal_down, "g")
+            axs[2].set_title(str("mean down :" + str(round(mean_down, 3)) + " / var down :" + str(round(np.var(signal_down), 3))))
+            axs[2].set(ylim=[-max, max])
+
+            plt.tight_layout()
+            plt.show()
+
     return np.array(result)
 
-#FSK
+
+
+import pyaudio
 import numpy as np
+import threading
+import keyboard
 import matplotlib.pyplot as plt
-from scipy.signal import butter, lfilter
 
-def fsk_modulate(data, f0, f1, fs, duration):
-    t = np.arange(0, duration * len(data), 1/fs)
-    modulated_signal = np.zeros(len(t))
+def record_audio(sample_rate=int(44e3)):
+    """
+    Record audio from the microphone until 'q' is pressed.
 
-    for i, bit in enumerate(data):
-        if bit == 0:
-            modulated_signal[i * int(fs * duration):(i + 1) * int(fs * duration)] = np.sin(2 * np.pi * f0 * t[i * int(fs * duration):(i + 1) * int(fs * duration)])
-        else:
-            modulated_signal[i * int(fs * duration):(i + 1) * int(fs * duration)] = np.sin(2 * np.pi * f1 * t[i * int(fs * duration):(i + 1) * int(fs * duration)])
-    
-    return modulated_signal
+    Parameters:
+    - sample_rate: The sample rate in Hz (default is 44e3).
 
-def butter_bandpass(lowcut, highcut, fs, order=5):
-    nyq = 0.5 * fs
-    low = lowcut / nyq
-    high = highcut / nyq
-    b, a = butter(order, [low, high], btype='band')
-    return b, a
+    Returns:
+    - fs: The sample rate used for recording.
+    - audio_data: The recorded audio data as a NumPy array.
+    """
+    audio_data = []
+    stop_event = threading.Event()
 
-def bandpass_filter(data, lowcut, highcut, fs, order=5):
-    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-    return lfilter(b, a, data)
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=sample_rate, input=True, frames_per_buffer=1024)
 
-def fsk_demodulate(modulated_signal, f0, f1, fs, duration):
-    demodulated_data = []
-    for i in range(len(modulated_signal) // int(fs * duration)):
-        segment = modulated_signal[i * int(fs * duration):(i + 1) * int(fs * duration)]
-        
-        # Filter for f0
-        filtered_f0 = bandpass_filter(segment, f0 - 50, f0 + 50, fs)
-        # Filter for f1
-        filtered_f1 = bandpass_filter(segment, f1 - 50, f1 + 50, fs)
-        
-        # Check energy in both filtered signals
-        energy_f0 = np.sum(filtered_f0 ** 2)
-        energy_f1 = np.sum(filtered_f1 ** 2)
-        
-        # Determine which frequency has more energy
-        if energy_f0 > energy_f1:
-            demodulated_data.append(0)
-        else:
-            demodulated_data.append(1)
-    
-    return demodulated_data
+    print("Recording... Press 'q' to stop.")
+
+    while True:
+        if keyboard.is_pressed('q'):
+            stop_event.set()
+            break
+        data = np.frombuffer(stream.read(1024), dtype=np.int16)
+        audio_data.append(data)
+
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    # Convert the list to a NumPy array
+    audio_data = np.concatenate(audio_data, axis=0)
+
+    return sample_rate, audio_data
+
+import IPython.display as ipd
+
+def display_audio_signal(audio_signal, fs=44e3):
+    ipd.display(ipd.Audio(audio_signal, rate=fs))
