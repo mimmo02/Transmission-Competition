@@ -523,10 +523,22 @@ def channel_coding_decapsulate(CCL_block):
     header_mean = np.mean(header)
     if header_mean < 0.5:
         Hamming_size = "15x11"
+        # check if the data is divisible by 15
+        if len(CCL_block) % 15 != 0:
+            # add zeros to the end of the data
+            zeros = 15 - len(CCL_block) % 15
+            CCL_block = np.append(CCL_block, np.zeros(zeros))
         CCL_data = np.array(CCL_block).reshape(-1, 15)
+        CCL_data = CCL_data.astype(int)
     elif header_mean >= 0.5:
         Hamming_size = "7x4"
+        # check if the data is divisible by 7
+        if len(CCL_block) % 7 != 0:
+            # add zeros to the end of the data
+            zeros = 7 - len(CCL_block) % 7
+            CCL_block = np.append(CCL_block, np.zeros(zeros))
         CCL_data = np.array(CCL_block).reshape(-1, 7)
+        CCL_data = CCL_data.astype(int)
    
     # return the data and the header
     return CCL_data, Hamming_size
@@ -581,12 +593,15 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
     fs = int(fs)
     fc = int(fc)
 
-
+    # normalize the signal amplitude (added by mimmo02)-------------------------------------
+    max = np.max(np.abs(modulated_signal))
+    modulated_signal = modulated_signal / max
+    #---------------------------------------------------------------------------------------
 
     modulated_signal = 2*modulated_signal
     # Generate the carrier signal
     y, c = PLL(fc, 0.01, 0.01, fs).track(modulated_signal)
-
+    
     # Demodulate the signal
     demodulated_signal = modulated_signal * y
     demodulated_signal = np.abs(demodulated_signal)
