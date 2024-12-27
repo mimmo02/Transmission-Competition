@@ -585,17 +585,25 @@ def am_modulate(binary_message, fs = 44e3, fc = 10e3,  num_cycles = 10):
     carrier = np.cos(2 * np.pi * fc * t)
     
     # Modulate the square wave
-    modulated_signal = (1 + square_wave)/2 * carrier
+    modulated_signal = (1 + square_wave)/2 * carrier      # bit 0 -> 0.5, bit 1 -> 1
     return modulated_signal
 
 def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
 
     fs = int(fs)
     fc = int(fc)
+    
+    bit_duration = num_cycles / fc
+    samples_per_bit = int(fs * bit_duration)
+    
 
     # normalize the signal amplitude (added by mimmo02)-------------------------------------
     max = np.max(np.abs(modulated_signal))
     modulated_signal = modulated_signal / max
+    
+    plt.figure()
+    plt.plot(modulated_signal)
+    plt.title("Normalized Modulated Signal")
     #---------------------------------------------------------------------------------------
 
     modulated_signal = 2*modulated_signal
@@ -606,16 +614,91 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
     demodulated_signal = modulated_signal * y
     demodulated_signal = np.abs(demodulated_signal)
     
+    plt.figure()
+    plt.plot(demodulated_signal)
+    plt.title("Demodulated Signal")
+    plt.show()
+    
     # Apply low-pass filter to the demodulated signal directly here
-    nyq = 0.5 * fs
-    normal_cutoff = 0.5*fc / nyq
+    normal_cutoff = fc/fs
     b, a = butter(5, normal_cutoff, btype='low', analog=False)
     filtered_demodulated_signal = filtfilt(b, a, demodulated_signal)
     
+  
+    
+    # normalize the signal amplitude (added by mimmo02)-------------------------------------
+    max = np.max(np.abs(filtered_demodulated_signal))
+    filtered_demodulated_signal = filtered_demodulated_signal / max
+    
+    mean = np.mean(filtered_demodulated_signal)
+    
+    # calculate the mean par each bit
+    means = []
+    for i in range(0, len(filtered_demodulated_signal), samples_per_bit):
+        means.append(np.mean(filtered_demodulated_signal[i:i+samples_per_bit]))
+    
+    # plot the means for each bit
+    plt.figure()
+    plt.plot(filtered_demodulated_signal)
+    # plot the means for each bit
+    for i in range(min(len(filtered_demodulated_signal) // samples_per_bit, len(means))):
+        plt.plot([i * samples_per_bit, (i + 1) * samples_per_bit], [means[i], means[i]], 'r')
+    plt.plot([0, len(filtered_demodulated_signal)], [mean, mean], 'g')
+    plt.title("Filtered Demodulated Signal")
+    plt.show()
+    
+    
+    # histogam of values
+    plt.figure()
+    plt.hist(filtered_demodulated_signal, bins=100)
+    plt.title("Histogram of the filtered demodulated signal")
+    plt.show()
+    
+    # histogram of means
+    plt.figure()
+    plt.hist(means, bins=10)
+    plt.title("Histogram of the means")
+    plt.show()
+    
+    
+    #function to reduce the overshoot
+    def sig_rescale(x,shift):
+        up = np.arctan((10.0-shift)*50)
+        down = np.arctan((-10.0-shift)*50)
+        ampl = np.abs(up) + np.abs(down)
+        y =  (np.arctan((x-shift)*50) + np.abs(down)) / ampl
+        return y
+    
+     
+    # rescale the bits depending on the mean value
+    for i in range(0, len(filtered_demodulated_signal), samples_per_bit):
+        #filtered_demodulated_signal[i:i+samples_per_bit] = sig_rescale(filtered_demodulated_signal[i:i+samples_per_bit], means[i//samples_per_bit])
+        filtered_demodulated_signal[i:i+samples_per_bit] = sig_rescale(filtered_demodulated_signal[i:i+samples_per_bit], mean)
+ 
+    
+        
+    
+    
+    #filtered_demodulated_signal = np.arctan((filtered_demodulated_signal-cut)*50)
+    #filtered_demodulated_signal[filtered_demodulated_signal < 0.8] = 0
+    
+    plt.figure()
+    plt.plot(filtered_demodulated_signal)
+    plt.title("Levelled Signal")
+    plt.show()
+    
+    #---------------------------------------------------------------------------------------
+    
     # Convert the filtered demodulated signal back to binary data
     filtered_demodulated_signal = np.round(2 * filtered_demodulated_signal) - 1
-    bit_duration = num_cycles / fc
-    samples_per_bit = int(fs * bit_duration)
+    # set negative values to 0
+    filtered_demodulated_signal[filtered_demodulated_signal < 0] = 0
+    
+    plt.figure()
+    plt.plot(filtered_demodulated_signal)
+    plt.title("Digitalized Demodulated Signal")
+    plt.show()
+    
     num_bits = len(filtered_demodulated_signal) // samples_per_bit
     binary_data = np.zeros(num_bits)
 
