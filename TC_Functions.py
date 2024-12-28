@@ -648,18 +648,6 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
     plt.show()
     
     
-    # histogam of values
-    plt.figure()
-    plt.hist(filtered_demodulated_signal, bins=100)
-    plt.title("Histogram of the filtered demodulated signal")
-    plt.show()
-    
-    # histogram of means
-    plt.figure()
-    plt.hist(means, bins=10)
-    plt.title("Histogram of the means")
-    plt.show()
-    
     
     #function to reduce the overshoot
     def sig_rescale(x,shift):
@@ -677,10 +665,7 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
  
     
         
-    
-    
-    #filtered_demodulated_signal = np.arctan((filtered_demodulated_signal-cut)*50)
-    #filtered_demodulated_signal[filtered_demodulated_signal < 0.8] = 0
+
     
     plt.figure()
     plt.plot(filtered_demodulated_signal)
