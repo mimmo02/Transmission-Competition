@@ -183,7 +183,7 @@ def decapsulation_source_coding_layer(encapsulated_data):
     # Get the dictionary
     dictionary = encapsulated_data[32:32+length_dict]
     # Get the text
-    encoded_text = encapsulated_data[32+length_dict:]
+    encoded_text = encapsulated_data[32+length_dict:32+length_dict+length_text]
 
     if method == 0:
         # cast to string type and binary to char
@@ -597,10 +597,14 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
     samples_per_bit = int(fs * bit_duration)
     
 
-    # normalize the signal amplitude (added by mimmo02)-------------------------------------
-    max = np.max(np.abs(modulated_signal))
+    # normalize the signal amplitude by dividing by the 100th maximum value(added by mimmo02)-------------------------------------
+    max = np.sort(np.abs(modulated_signal))[::-1][100]
     modulated_signal = modulated_signal / max
-    
+
+    # convert to mono the double channel signal if needed (added by @biofainapap)
+    if len(modulated_signal.shape) > 1:
+        modulated_signal = modulated_signal[:, 0]
+
     plt.figure()
     plt.plot(modulated_signal)
     plt.title("Normalized Modulated Signal")
@@ -693,6 +697,15 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
 
     return binary_data.astype(int)
 
+# syncro bits detection for AM (done by @biofainapap)
+def syncro_bits_detection(data):
+    syncro_bits = [1,1,0,0,1,1,0,0,1,1]
+    syncro_bits_len = len(syncro_bits)
+    for i in range(len(data)-syncro_bits_len):
+        if np.array_equal(data[i:i+syncro_bits_len], syncro_bits):
+            return data[i+syncro_bits_len:]
+    return data
+    
 # Chirp
 def chirp_modulate(data, fs = 44e3, fc = 10e3, bw = 2e3, T = 0.01) :
 
