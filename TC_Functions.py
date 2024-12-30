@@ -634,12 +634,57 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
     max = np.max(np.abs(filtered_demodulated_signal))
     filtered_demodulated_signal = filtered_demodulated_signal / max
     
-    mean = np.mean(filtered_demodulated_signal)
     
     # calculate the mean par each bit
     means = []
     for i in range(0, len(filtered_demodulated_signal), samples_per_bit):
         means.append(np.mean(filtered_demodulated_signal[i:i+samples_per_bit]))
+    
+    # cancel the silence bits
+    # caluculate the mean of 5 bits set
+    
+    part_means = []
+    std = []
+    
+    for i in range(0, len(means), 5):
+        group_mean = np.mean(means[i:i+5])
+        # calculate the standard deviation of the group
+        group_std = np.std(means[i:i+5])
+        part_means.append(group_mean)
+        std.append(group_std)
+        
+    std_mean = np.mean(std)
+    part_means_mean = np.mean(part_means)   
+        
+    plt.figure()
+    plt.plot(part_means)
+    plt.plot(std)
+    plt.plot([0, len(part_means)], [part_means_mean, part_means_mean], 'r')
+    plt.plot([0, len(std)], [std_mean, std_mean], 'g')
+    plt.title("Means and Standard Deviation")
+    plt.show()
+        
+    # search for std < std_mean and part_means < part_means_mean
+    del_num = 0
+    for i in range(0, len(means), 5):
+        if std[i//5] < std_mean and part_means[i//5] < part_means_mean:
+            del_num += 5
+        else:
+            break
+        
+    filtered_demodulated_signal = filtered_demodulated_signal[del_num*samples_per_bit:]
+    
+    plt.figure()
+    plt.plot(filtered_demodulated_signal)
+    plt.title("Filtered Demodulated Signal without silence bits")
+    plt.show()
+    
+            
+
+    
+    mean = np.mean(filtered_demodulated_signal)
+    
+    
     
     # plot the means for each bit
     plt.figure()
@@ -697,13 +742,23 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
 
     return binary_data.astype(int)
 
-# syncro bits detection for AM (done by @biofainapap)
+
+# add syncro bits to the data (added by mimmo02)
+def syncro_bits_addition(data):
+    dummy = [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]   # 10 syncro bits
+    bits = [1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,0,0]    # 10 syncro bits
+    syncro_bits = np.concatenate((dummy, bits))
+    return np.concatenate((syncro_bits, data))
+
+
+# syncro bits detection for AM (modified by mimmo02)
 def syncro_bits_detection(data):
-    syncro_bits = [1,1,0,0,1,1,0,0,1,1]
-    syncro_bits_len = len(syncro_bits)
-    for i in range(len(data)-syncro_bits_len):
-        if np.array_equal(data[i:i+syncro_bits_len], syncro_bits):
-            return data[i+syncro_bits_len:]
+    syncro_bits_window = [1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,0,0] # 10 syncro bits
+    syncro_bits_window_len = len(syncro_bits_window)
+    # find the syncro bits sliding the window
+    for i in range(len(data) - syncro_bits_window_len):
+        if np.all(data[i:i + syncro_bits_window_len] == syncro_bits_window):
+            return data[i + syncro_bits_window_len:]
     return data
     
 # Chirp
