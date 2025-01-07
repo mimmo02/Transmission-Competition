@@ -763,70 +763,122 @@ def syncro_bits_detection(data):
     
 # Chirp
 def chirp_modulate(data, fs = 44e3, fc = 10e3, bw = 2e3, T = 0.01) :
-
+ 
     t = np.arange(0, T, 1/fs)  # Time vector
-
+ 
     # Preallocate the chirp signal array
     chirp_signal = np.zeros(len(data) * len(t))
-
+ 
     for i in range(len(data)):
         start_index = i * len(t)
         if data[i] == 0:
             chirp_signal[start_index:start_index + len(t)] = np.cos(2 * np.pi * ((fc + bw/2) * t + ((fc - bw/2) - ((fc + bw/2))) / (2 * T) * t**2))
         elif data[i] == 1:
             chirp_signal[start_index:start_index + len(t)] = np.cos(2 * np.pi * ((fc - bw/2) * t + ((fc + bw/2) - (fc - bw/2)) / (2 * T) * t**2))
-
+ 
     return chirp_signal
-
-
+ 
+def find_start(signal):
+    signal = np.array(signal)
+ 
+    # Replace the above line with the following code
+    variance_sign = []
+    for i in range(50, len(signal), 10):
+        actual_sign = np.sign(np.var(signal[i: i + 100]) - 0.25)
+        variance_sign.append(actual_sign)
+        if actual_sign == 1:
+            break
+ 
+   
+    variance_sign = np.array(variance_sign)
+    indice = np.where(np.diff(variance_sign) > 0)[0] + 11
+    indice = 10 * indice
+ 
+    # Check if indice is not empty
+    if indice.size > 0:
+        # Use the first valid index for slicing
+        start_index = indice[0]  # Get the first index
+        signal = signal[start_index:]  # Slice the signal from the first valid index
+    else:
+        print("No valid indices found.")
+        return signal  # or handle as needed
+ 
+    return signal
+ 
 def chirp_demodulate(received_signal, fs, fc = 10e3, bw = 2e3, T = 0.01, debug = False):
-
+ 
+    received_signal = find_start(received_signal)
+ 
     t = np.arange(0, T, 1/fs)  # Time vector for the chirp
-
+ 
     up = np.cos(2 * np.pi * ((fc + bw/2) * t + ((fc - bw/2) - ((fc + bw/2))) / (2 * T) * t**2))
     down = np.cos(2 * np.pi * ((fc - bw/2) * t + ((fc + bw/2) - (fc - bw/2)) / (2 * T) * t**2))
-
+ 
     result = []
-
+ 
     nyq = 0.5 * fs
     normal_cutoff = 0.5*fc / nyq
     b, a = butter(5, normal_cutoff, btype='low', analog=False)
-
-
+ 
+ 
+ 
     for i in range(int(len(received_signal)/len(t))) :
         signal_up = received_signal[i*len(t): (i + 1)*len(t)] * up
         signal_down = received_signal[i*len(t): (i + 1)*len(t)] * down
-
+ 
         signal_up = filtfilt(b, a, signal_up)
         signal_down = filtfilt(b, a, signal_down)
-
-
+ 
+ 
         mean_up = signal_up.sum() / len(signal_up)
         mean_down = signal_down.sum() / len(signal_down)
-
-        if mean_up > mean_down and mean_up > 0.4 :
+ 
+        var_up = np.var(signal_up)
+        var_down = np.var(signal_down)
+ 
+        if mean_up > mean_down and var_up < var_down/2 :
             result.append(0)
-        elif mean_down > mean_up and mean_down > 0.4 :
+        elif mean_down > mean_up and var_down < var_up/2 :
             result.append(1)
-
-        
-        if debug : 
+ 
+       
+        if debug :
             max = 1.5*np.max(np.abs(np.r_[received_signal[i*len(t): (i + 1)*len(t)], signal_up, signal_down]))
             fig, axs = plt.subplots(3)
             axs[0].plot(received_signal[i*len(t): (i + 1)*len(t)], "b")
             axs[0].set(ylim=[-max, max])
-
+ 
             axs[1].plot(signal_up, "r")
             axs[1].set_title(str("mean up :" + str(round(mean_up, 3))) + " / var up :" + str(round(np.var(signal_up), 3)))
             axs[1].set(ylim=[-max, max])
-
+ 
             axs[2].plot(signal_down, "g")
             axs[2].set_title(str("mean down :" + str(round(mean_down, 3)) + " / var down :" + str(round(np.var(signal_down), 3))))
             axs[2].set(ylim=[-max, max])
-
+ 
             plt.tight_layout()
             plt.show()
-
+ 
+            if i == 0 :
+                signal_up_all = signal_up
+                signal_down_all = signal_down
+            else :
+                signal_up_all = np.concatenate((signal_up_all, signal_up))
+                signal_down_all = np.concatenate((signal_down_all, signal_down))
+ 
+    if debug :
+        fig, axs = plt.subplots(3)
+        axs[0].plot(received_signal, "b")
+ 
+        axs[1].plot(signal_up_all, "r")
+ 
+        axs[2].plot(signal_down_all, "g")
+ 
+        plt.tight_layout()
+        plt.show()
+ 
+ 
+ 
     return np.array(result)
 
 
