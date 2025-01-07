@@ -745,7 +745,7 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
 
 # add syncro bits to the data (added by mimmo02)
 def syncro_bits_addition(data):
-    dummy = [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]   # 10 syncro bits
+    dummy = 10*[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]   # 10 syncro bits
     bits = [1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,0,0]    # 10 syncro bits
     syncro_bits = np.concatenate((dummy, bits))
     return np.concatenate((syncro_bits, data))
