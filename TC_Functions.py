@@ -806,8 +806,13 @@ def find_start(signal):
     return signal
  
 def chirp_demodulate(received_signal, fs, fc = 10e3, bw = 2e3, T = 0.01, debug = False):
+
+    # normalize the signal amplitude by dividing by the 100th maximum value(added by mimmo02)-------------------------------------
+    max = np.sort(np.abs(received_signal))[::-1][100]
+    received_signal = received_signal / max
  
     received_signal = find_start(received_signal)
+    print(len(received_signal))
  
     t = np.arange(0, T, 1/fs)  # Time vector for the chirp
  
