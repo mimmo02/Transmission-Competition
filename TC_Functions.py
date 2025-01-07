@@ -222,6 +222,8 @@ def source_encoding(text):
     # Perform huffman and LZW encoding to compare and choose best method
     encoded_text_huffman, dict_huffman = huffman_encoding(text)
     encoded_text_LZW, dict_LZW = LZW_encoding(text)
+    # Compression ratio
+    compression_ratio(text, dict_huffman, dict_LZW)
     # Encapsulate data both methods
     encapsulated_data_source_H = encapsulation_source_coding_layer(0, encoded_text_huffman, dict_huffman)
     encapsulated_data_source_L = encapsulation_source_coding_layer(1, encoded_text_LZW, dict_LZW)
@@ -254,6 +256,27 @@ def source_decoding(data_received):
     print('@source_decoding_layer-> Source Decoding Data:', source_decoding_data)
     return source_decoding_data
 
+# Function that returns compression ratio
+def compression_ratio(text, dict_huffman, dict_LZW):
+    # Get size of the file.txt file with fixed length coding
+    # Get how many unique characters are in the text
+    unique, counts = np.unique(list(text), return_counts=True)
+    probabilities = counts/np.sum(counts)
+    # Calculate the size of a symbol in bits
+    fixed_length_size = np.ceil(np.log2(len(unique)))
+    # Calculate bit/symbol for LZW and Huffman
+    # Huffman (sum of (probabilities of each character * its code length))
+    huffman_size = np.sum([len(dict_huffman[key])*probabilities[i] for i, key in enumerate(unique)])
+    print(huffman_size)
+    # LZW (close to H0 so log2(number of indexes of the dictionary))
+    LZW_size = np.log2(len(dict_LZW))
+    print(LZW_size)
+    # Calculate the compression ratio
+    compression_ratio_H = huffman_size / fixed_length_size
+    compression_ratio_L = LZW_size / fixed_length_size
+    print('@source_coding_layer-> Compression ratio Huffman:', compression_ratio_H)
+    print('@source_coding_layer-> Compression ratio LZW:', compression_ratio_L)
+    return compression_ratio
 # CHANNEL CODING LAYER
 
 # notation G: generation matrix, H: parity-check matrix, D: data extraction matrix
@@ -346,13 +369,15 @@ def channel_decode_gen(codeword, H, D):
     m = len(H[0][:]) # number of parity bits
     c= np.array(codeword)
     p = np.dot(c, H) % 2
+    error = False
     if p.any():
         error_position = np.sum([2**i for i in range(m) if p[i] == 1])
         # flip the bit in the error position
         c[error_position-1] = 1 - c[error_position-1]
-                
+        error = True
+               
     data = np.dot(c, D) % 2
-    return data
+    return data,error
 
 def split_packet(message, packet_size):
     # message: binary data
@@ -404,17 +429,20 @@ def channel_decoding(COD,Hamming_size):
         H = H_7_4
         D = D_7_4
     packets = []
+    errors = 0
     for codeword in COD:
-        packet = channel_decode_gen(codeword, H, D)
+        packet,error = channel_decode_gen(codeword, H, D)
+        if error:
+            errors += 1
         packets.append(packet)
     print("@channel_coding_layer-> Decoded Packets: ", packets)
     # first packet is the number of zeros added
-    fill_bits = packets.pop(0) 
+    fill_bits = packets.pop(0)
     # binary to decimal
-    fill_bits = int(''.join([str(x) for x in fill_bits]), 2) 
+    fill_bits = int(''.join([str(x) for x in fill_bits]), 2)
     # unite the packets
     packets = [item for sublist in packets for item in sublist]
-    return packets,fill_bits
+    return packets,fill_bits,errors
 
 # Conversion functions between source coding and channel coding
 
@@ -745,7 +773,7 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
 
 # add syncro bits to the data (added by mimmo02)
 def syncro_bits_addition(data):
-    dummy = 10*[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]   # 10 syncro bits
+    dummy = 15*[1,0]
     bits = [1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,0,0]    # 10 syncro bits
     syncro_bits = np.concatenate((dummy, bits))
     return np.concatenate((syncro_bits, data))
