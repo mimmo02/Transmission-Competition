@@ -229,9 +229,9 @@ def source_encoding(text):
     encapsulated_data_source_L = encapsulation_source_coding_layer(1, encoded_text_LZW, dict_LZW)
     # Get length of the two methods
     Huffman_length = len(encapsulated_data_source_H)
-    print('@source_coding_layer-> Huffman length:', Huffman_length)
+    print('@source_coding_layer-> Huffman length:', Huffman_length, 'bits')
     LZW_length = len(encapsulated_data_source_L)
-    print('@source_coding_layer-> LZW length:', LZW_length) 
+    print('@source_coding_layer-> LZW length:', LZW_length, 'bits') 
     # Choose the best method
     if Huffman_length < LZW_length:
         print('@source_coding_layer-> Huffman encoding is the best method')
@@ -267,10 +267,8 @@ def compression_ratio(text, dict_huffman, dict_LZW):
     # Calculate bit/symbol for LZW and Huffman
     # Huffman (sum of (probabilities of each character * its code length))
     huffman_size = np.sum([len(dict_huffman[key])*probabilities[i] for i, key in enumerate(unique)])
-    print(huffman_size)
     # LZW (close to H0 so log2(number of indexes of the dictionary))
     LZW_size = np.log2(len(dict_LZW))
-    print(LZW_size)
     # Calculate the compression ratio
     compression_ratio_H = huffman_size / fixed_length_size
     compression_ratio_L = LZW_size / fixed_length_size
@@ -702,11 +700,6 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
         
     filtered_demodulated_signal = filtered_demodulated_signal[del_num*samples_per_bit:]
     
-    plt.figure()
-    plt.plot(filtered_demodulated_signal)
-    plt.title("Filtered Demodulated Signal without silence bits")
-    plt.show()
-    
             
 
     
@@ -718,8 +711,8 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
     plt.figure()
     plt.plot(filtered_demodulated_signal)
     # plot the means for each bit
-    for i in range(min(len(filtered_demodulated_signal) // samples_per_bit, len(means))):
-        plt.plot([i * samples_per_bit, (i + 1) * samples_per_bit], [means[i], means[i]], 'r')
+    #for i in range(min(len(filtered_demodulated_signal) // samples_per_bit, len(means))):
+    #   plt.plot([i * samples_per_bit, (i + 1) * samples_per_bit], [means[i], means[i]], 'r')
     plt.plot([0, len(filtered_demodulated_signal)], [mean, mean], 'g')
     plt.title("Filtered Demodulated Signal")
     plt.show()
