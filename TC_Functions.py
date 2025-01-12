@@ -574,25 +574,36 @@ def channel_coding_decapsulate(CCL_block):
 import numpy as np
 from scipy.signal import butter, filtfilt
 
-class PLL:
-    def __init__(self, wc: float, phase_gain: float, freq_gain: float, sf=None):
-        self.wc = 2 * np.pi * wc / sf if sf else wc
-        self.pg, self.fg = phase_gain, freq_gain
-        self.freq_offset = 0
-        self.nco_phase = 0
+def PLL_function(input_signal, fc, phase_gain, freq_gain, fs):
+    # Calculate the normalized angular frequency
+    angular_frequency = 2 * np.pi * fc / fs
+    current_phase = 0
+    frequency_offset = 0
+    
+    # Initialize output and control arrays
+    output_signal = np.zeros(len(input_signal))
+    control_signal = np.zeros(len(input_signal))
 
-    def track(self, x: np.ndarray, ) -> np.ndarray:
-        y = np.zeros(len(x))
-        c = np.zeros(len(x))
-        for n in range(0, len(x)):
-            y[n] = np.cos(self.nco_phase)
-            phase_offset = -x[n] * np.sin(self.nco_phase)
-            self.freq_offset += self.fg * phase_offset
-            c[n] = self.pg * phase_offset + self.freq_offset
-            self.nco_phase += self.wc + c[n]
-            # wrap the phase over the [0, 2\pi] interval
-            self.nco_phase = (self.nco_phase + np.pi) % (2 * np.pi) - np.pi
-        return y, c
+    for i in range(len(input_signal)):
+        # Generate the output signal based on the current phase
+        output_signal[i] = np.cos(current_phase)
+        
+        # Calculate the phase offset based on the input signal
+        phase_offset = -input_signal[i] * np.sin(current_phase)
+        
+        # Update the frequency offset
+        frequency_offset += freq_gain * phase_offset
+        
+        # Calculate the control signal
+        control_signal[i] = phase_gain * phase_offset + frequency_offset
+        
+        # Update the current phase
+        current_phase += angular_frequency + control_signal[i]
+        
+        # Normalize the phase to the range [-pi, pi]
+        current_phase = (current_phase + np.pi) % (2 * np.pi) - np.pi
+
+    return output_signal
 
 def am_modulate(binary_message, fs = 44e3, fc = 10e3,  num_cycles = 10):
 
@@ -638,7 +649,7 @@ def am_demodulate(modulated_signal, fs = 44e3, fc = 10e3, num_cycles = 10):
 
     modulated_signal = 2*modulated_signal
     # Generate the carrier signal
-    y, c = PLL(fc, 0.01, 0.01, fs).track(modulated_signal)
+    y =  PLL_function(modulated_signal, fc, 0.01, 0.01, fs)
     
     # Demodulate the signal
     demodulated_signal = modulated_signal * y
